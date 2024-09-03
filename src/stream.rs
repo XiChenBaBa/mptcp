@@ -32,9 +32,10 @@ impl MptcpStream {
     }
 
     pub async fn connect(
-        addr: impl ToSocketAddrs + Clone + Send + Sync + 'static,
+        addr: impl IntoIterator<Item = impl ToSocketAddrs + Clone + Send + Sync + 'static>,
         streams: NonZeroUsize,
     ) -> io::Result<Self> {
+        let mut address = addr.into_iter();
         let mut read_streams = vec![];
         let mut write_streams = vec![];
         let session: u64 = rand::random();
@@ -43,10 +44,11 @@ impl MptcpStream {
 
         let mut connections = JoinSet::new();
         for _ in 0..streams.get() {
-            let addr = addr.clone();
+            let addr = address.next().unwrap();
             let init = init.clone();
             connections.spawn(async move {
                 let mut stream = TcpStream::connect(&addr).await?;
+                stream.set_nodelay(true)?;
                 let peer_addr = stream.peer_addr().unwrap();
                 init.encode(&mut stream).await?;
                 Ok::<_, io::Error>((stream, peer_addr))

@@ -55,6 +55,7 @@ impl MptcpListener {
                             continue;
                         }
                     };
+                    let _ = stream.set_nodelay(true);
                     backlog.handle(stream, &complete).await;
                 }
             });

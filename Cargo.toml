@@ -9,6 +9,7 @@ edition = "2021"
 members = ["cli"]
 
 [dependencies]
+anyhow = "1.0.86"
 async_async_io = "0.2"
 bytes = "1"
 rand = "0.8"

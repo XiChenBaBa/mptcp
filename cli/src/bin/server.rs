@@ -1,48 +1,30 @@
-use clap::Parser;
-use cli::{print_performance_statistics, FileTransferCommand, Protocol};
-use mptcp::listen::MptcpListener;
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::TcpListener,
-};
+use std::{net::SocketAddr, num::NonZeroUsize};
 
-#[derive(Debug, Parser)]
+use mptcp::listen::MptcpListener;
+use tokio::net::TcpStream;
+
+#[derive(Debug,  serde::Serialize, serde::Deserialize)]
 pub struct Cli {
     /// The listen address
     pub listen: String,
-    #[command(subcommand)]
-    pub file_transfer: FileTransferCommand,
+    pub streams: NonZeroUsize,
+    pub remote: String,
 }
 
 #[tokio::main]
-async fn main() {
-    let args = Cli::parse();
-
-    let (protocol, internet_address) = args.listen.split_once("://").unwrap();
-    let protocol: Protocol = protocol.parse().expect("Unknown protocol");
-    let (read, write): (Box<dyn AsyncRead + Unpin>, Box<dyn AsyncWrite + Unpin>) = match protocol {
-        Protocol::Tcp => {
-            let listener = TcpListener::bind(internet_address).await.unwrap();
-            let (stream, _) = listener.accept().await.unwrap();
-            let (read, write) = stream.into_split();
-            (Box::new(read), Box::new(write))
-        }
-        Protocol::Mptcp { streams } => {
-            let mut listener = MptcpListener::bind(internet_address, streams)
-                .await
-                .unwrap();
-            let stream = listener.accept().await.unwrap();
-            let (read, write) = stream.into_split();
-            (Box::new(read), Box::new(write))
-        }
-    };
-
-    let start = std::time::Instant::now();
-    let n = args.file_transfer.perform(read, write).await.unwrap();
-    let duration = start.elapsed();
-    match &args.file_transfer {
-        FileTransferCommand::Push(_) => println!("Read {n} bytes"),
-        FileTransferCommand::Pull(_) => println!("Wrote {n} bytes"),
+async fn main() -> anyhow::Result<()> {
+    let cfg = std::env::args().nth(1).unwrap();
+    let args: Cli = serde_json::from_str(tokio::fs::read_to_string(&cfg).await?.as_str())?;
+    let bind_addr = args.listen.parse::<SocketAddr>()?;
+    let mut listener = MptcpListener::bind(bind_addr, args.streams).await.unwrap();
+    while let Ok(mut s) = listener.accept().await {
+        let remote = args.remote.parse::<SocketAddr>()?;
+        tokio::spawn(async move {
+            let mut remote_stream = TcpStream::connect(remote).await?;
+            remote_stream.set_nodelay(true)?;
+            let _ = tokio::io::copy_bidirectional(&mut remote_stream, &mut s).await;
+            Ok::<_, anyhow::Error>(())
+        });
     }
-    print_performance_statistics(n, duration);
+    Ok(())
 }

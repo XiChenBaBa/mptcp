@@ -4,7 +4,7 @@ use bytes::Bytes;
 
 use crate::message::{DataSegment, Sequence};
 
-const MINIMUM_PAYLOAD_SIZE: usize = 1024;
+const MINIMUM_PAYLOAD_SIZE: usize = 8192;
 
 #[derive(Debug)]
 pub struct SendStreamBuf {

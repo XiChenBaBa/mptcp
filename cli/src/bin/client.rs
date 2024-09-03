@@ -1,46 +1,33 @@
-use clap::Parser;
-use cli::{print_performance_statistics, FileTransferCommand, Protocol};
-use mptcp::stream::MptcpStream;
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::TcpStream,
-};
+use std::{net::SocketAddr, num::NonZeroUsize};
 
-#[derive(Debug, Parser)]
+use mptcp::stream::MptcpStream;
+use tokio::net::TcpListener;
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Cli {
     /// The server address
-    pub server: String,
-    #[command(subcommand)]
-    pub file_transfer: FileTransferCommand,
+    pub servers: Vec<String>,
+    pub local_bind: String,
 }
 
 #[tokio::main]
-async fn main() {
-    let args = Cli::parse();
-
-    let (protocol, internet_address) = args.server.split_once("://").unwrap();
-    let protocol: Protocol = protocol.parse().expect("Unknown protocol");
-    let (read, write): (Box<dyn AsyncRead + Unpin>, Box<dyn AsyncWrite + Unpin>) = match protocol {
-        Protocol::Tcp => {
-            let stream = TcpStream::connect(internet_address).await.unwrap();
-            let (read, write) = stream.into_split();
-            (Box::new(read), Box::new(write))
-        }
-        Protocol::Mptcp { streams } => {
-            let stream = MptcpStream::connect(internet_address.to_string(), streams)
+async fn main() -> anyhow::Result<()> {
+    let cfg = std::env::args().nth(1).unwrap();
+    let args: Cli = serde_json::from_str(tokio::fs::read_to_string(&cfg).await?.as_str())?;
+    let streams = args.servers.len();
+    let local_bind = TcpListener::bind(args.local_bind).await?;
+    while let Ok((mut s, _)) = local_bind.accept().await {
+        let servers = args.servers.clone();
+        s.set_nodelay(true)?;
+        tokio::spawn(async move {
+            let address = servers
+                .into_iter()
+                .map(|x| x.parse::<SocketAddr>().unwrap());
+            let mut stream = MptcpStream::connect(address, NonZeroUsize::new(streams).unwrap())
                 .await
                 .unwrap();
-            let (read, write) = stream.into_split();
-            (Box::new(read), Box::new(write))
-        }
-    };
-
-    let start = std::time::Instant::now();
-    let n = args.file_transfer.perform(read, write).await.unwrap();
-    let duration = start.elapsed();
-    match &args.file_transfer {
-        FileTransferCommand::Push(_) => println!("Read {n} bytes"),
-        FileTransferCommand::Pull(_) => println!("Wrote {n} bytes"),
+            let _ = tokio::io::copy_bidirectional(&mut s, &mut stream).await;
+        });
     }
-    print_performance_statistics(n, duration);
+    Ok(())
 }

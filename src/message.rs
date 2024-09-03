@@ -89,7 +89,7 @@ impl DataSegment {
         W: AsyncWrite + Unpin,
     {
         writer.write_u64(self.start_sequence.inner()).await?;
-        writer.write_u64(self.payload.len() as u64).await?;
+        writer.write_u16(self.payload.len() as u16).await?;
         writer.write_all(&self.payload).await?;
         Ok(())
     }
@@ -124,7 +124,7 @@ impl DataSegment {
         R: AsyncRead + Unpin,
     {
         let start_sequence = reader.read_u64().await?;
-        let length = reader.read_u64().await?;
+        let length = reader.read_u16().await?;
         let length =
             usize::try_from(length).map_err(|e| io::Error::new(io::ErrorKind::Unsupported, e))?;
         let mut payload = BytesMut::with_capacity(length);
