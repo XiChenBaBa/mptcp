@@ -25,7 +25,7 @@
 
 - **listen**:The address and port the server will bind to.
 - **streams**: The number of streams to be used.
-- **remote**: The address of the upstream server.
+- **remote**: The address of the upstream server. Such as Shadowsocks or VMess or anything else.
 ```json
 {
     "listen": "0.0.0.0:30001",
@@ -33,3 +33,5 @@
     "remote": "127.0.0.1:27429"
 }
 ```
+
+Finally, data sent to port 12811 on the client will be transparently delivered to the service listening on port 27429 on the server.
