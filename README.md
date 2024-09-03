@@ -2,43 +2,34 @@
 
 ![Session](img/session.drawio.png)
 
-## How to transfer a file
+## How to use
 
 1. Install Rust: <https://www.rust-lang.org/tools/install>
 1. `git clone <REPO_URL>.git`
-1. On the server side, run `cargo run -r -p cli --bin server -- <STREAMS> <LISTEN> <COMMAND>`
-   - `<LISTEN>`: The listen address
-     - e.g., `tcp://127.0.0.1:12345`
-     - e.g., `mptcp.4://127.0.0.1:12345`
-       - `.4`: The maximum number of TCP streams to accept
-   - `<COMMAND>`: either:
-     - `push <SOURCE_FILE>`: To push a file from `<SOURCE_FILE>` to the peer
-     - `pull <OUTPUT_FILE>`: To pull a file from the peer to `<OUTPUT_FILE>`
-1. On the client side, run `cargo run -r -p cli --bin client -- <STREAMS> <SERVER> <COMMAND>`
-   - `<SERVER>`: The server address
-     - e.g., `tcp://127.0.0.1:12345`
-     - e.g., `mptcp.4://127.0.0.1:12345`
-       - `.4`: The number of TCP streams to connect
+1. On the server side, run `cargo run -r -p cli --bin server -- config.json`
+1. On the client side, run `cargo run -r -p cli --bin client -- config.json`
 
-## How to use MPTCP in code
+### Client-side `config.json`
 
-Server:
+- **servers**: The server endpoints to connect to.
+- **local_bind**: The local port to bind to for client access.
 
-```rust
-let mut listener = MptcpListener::bind(addr, max_session_streams).await.unwrap();
-let stream = listener.accept().await.unwrap();
-let (mut read, mut write) = stream.into_split();
-let mut buf = [0; 13];
-read.read_exact(&mut buf).await.unwrap();
-write.write_all(b"Hello client!").await.unwrap();
+```json
+{
+    "servers": ["1.2.3.4:30001", "1.2.3.4:30001"],
+    "local_bind": "0.0.0.0:12811"
+}
 ```
 
-Client:
+### Server-side `config.json`
 
-```rust
-let stream = MptcpStream::connect(addr, num_streams).await.unwrap();
-let (mut read, mut write) = stream.into_split();
-write.write_all(b"Hello server!").await.unwrap();
-let mut buf = [0; 13];
-read.read_exact(&mut buf).await.unwrap();
+- **listen**:The address and port the server will bind to.
+- **streams**: The number of streams to be used.
+- **remote**: The address of the upstream server.
+```json
+{
+    "listen": "0.0.0.0:30001",
+    "streams": 2,
+    "remote": "127.0.0.1:27429"
+}
 ```
