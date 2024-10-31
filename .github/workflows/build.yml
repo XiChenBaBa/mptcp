@@ -7,30 +7,37 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        target: [x86_64-unknown-linux-gnu, x86_64-pc-windows-msvc]
+
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3  # 更新到最新版本
+      uses: actions/checkout@v3
 
     - name: Set up Rust
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         override: true
+        components: rustfmt
 
-    - name: Build Server
-      run: cargo build --release --package cli --bin server
-
-    - name: Build Client
-      run: cargo build --release --package cli --bin client
+    - name: Build
+      run: |
+        cargo build --release --package cli --bin server
+        cargo build --release --package cli --bin client
+      env:
+        CARGO_TARGET_DIR: target/${{ matrix.os }}
 
     - name: Archive Server Artifact
-      uses: actions/upload-artifact@v3  # 使用最新版本
+      uses: actions/upload-artifact@v3
       with:
-        name: server-executable
-        path: target/release/server  # 根据实际可执行文件名调整
+        name: server-${{ matrix.os }}
+        path: target/${{ matrix.os }}/release/server
 
     - name: Archive Client Artifact
-      uses: actions/upload-artifact@v3  # 使用最新版本
+      uses: actions/upload-artifact@v3
       with:
-        name: client-executable
-        path: target/release/client  # 根据实际可执行文件名调整
+        name: client-${{ matrix.os }}
+        path: target/${{ matrix.os }}/release/client
