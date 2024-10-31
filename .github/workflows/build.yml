@@ -1,0 +1,30 @@
+name: Build Rust Project
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Build
+      run: cargo build --release
+
+    - name: Archive artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: rust-executable
+        path: target/release/mptcp
