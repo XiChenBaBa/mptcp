@@ -9,7 +9,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3  # 更新到最新版本
 
     - name: Set up Rust
       uses: actions-rs/toolchain@v1
@@ -17,11 +17,20 @@ jobs:
         toolchain: stable
         override: true
 
-    - name: Build
-      run: cargo build --release
+    - name: Build Server
+      run: cargo build --release --package cli --bin server
 
-    - name: Archive artifact
-      uses: actions/upload-artifact@v2
+    - name: Build Client
+      run: cargo build --release --package cli --bin client
+
+    - name: Archive Server Artifact
+      uses: actions/upload-artifact@v3  # 使用最新版本
       with:
-        name: rust-executable
-        path: target/release/mptcp
+        name: server-executable
+        path: target/release/server  # 根据实际可执行文件名调整
+
+    - name: Archive Client Artifact
+      uses: actions/upload-artifact@v3  # 使用最新版本
+      with:
+        name: client-executable
+        path: target/release/client  # 根据实际可执行文件名调整
